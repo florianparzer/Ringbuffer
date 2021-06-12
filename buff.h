@@ -13,7 +13,6 @@
 #define SHMNAME "/ringbuffer"
 
 typedef struct buffer{
-	size_t len;
 	size_t rIndex;
 	size_t wIndex;
 	char data[];
