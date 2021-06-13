@@ -54,10 +54,18 @@ int main(int argc, char **argv) {
 	sem_post(writeSem);
 
 	//Reading part of the program
-	sem_wait(readSem);
-	printf("%c", sharedMem->data[sharedMem->rIndex]);
-	sharedMem->rIndex++;
-	sem_post(writeSem);
+	char ch;
+	while(1){
+		sem_wait(readSem);
+		ch = sharedMem->data[sharedMem->rIndex];
+		if(ch == EOF){
+			break;
+		}
+		printf("%c", ch);
+		fflush(stdout);
+		sharedMem->rIndex = (sharedMem->rIndex + 1)% len;
+		sem_post(writeSem);
+	}
 
 	//Release Semaphoore and Shared Memory
 	if(munmap(sharedMem, bufferSize) != 0){

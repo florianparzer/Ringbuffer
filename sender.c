@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include "buff.h"
 
 int main(int arc, char **argv){
@@ -73,20 +74,36 @@ int main(int arc, char **argv){
 	}
 
 
-	sharedMem->rIndex=0;
-	sharedMem->wIndex=0;
+	sharedMem->rIndex = 0;
+	sharedMem->wIndex = 0;
 	sem_post(readSem);
 
 	printf("Start writing\n");
-	char ch = NULL;
+	int result = 0;
+	char input[500];
+	char *ch;
 
-	while(ch != EOF){
-		printf("%ld", writeSem->__align);
-		sem_wait(writeSem);
-		ch = getchar();
-		sharedMem->data[sharedMem->wIndex] = ch;
-		sharedMem->wIndex++;
-		sem_post(readSem);
+	while(1){
+		result = scanf("%s", input);
+
+		if(result == EOF){
+			sharedMem->data[sharedMem->wIndex] = EOF;
+			sharedMem->wIndex++;
+			sem_post(readSem);
+			break;
+		}
+
+		//strcat(input, "\0")
+		printf("scan works %s\n", input);
+
+		for(ch = input; *ch != '\0'; ch++){
+			sem_wait(writeSem);
+			printf("%c %ld\n", *ch, writeSem->__align);
+			sharedMem->data[sharedMem->wIndex] = *ch;
+			sharedMem->wIndex = (sharedMem->wIndex + 1) % len;
+			sem_post(readSem);
+		}
+
 	}
 	printf("after wait\n");
 
