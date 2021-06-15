@@ -11,14 +11,45 @@
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include "buff.h"
 
-int main(int arc, char **argv){
-	size_t len = 20;
+int main(int argc, char *argv[]){
+	int opt;
+	char *options = "m:";
+	char *error;
+
+	size_t len;
+
+	if(argc <=2){
+		fprintf(stderr, "Option m is missing\n");
+		return 1;
+	}
+
+	while((opt = getopt(argc, argv, options)) != -1){
+		switch(opt){
+			case 'm':
+				len = strtol(optarg, &error, 10);
+				if(*optarg == *error){
+					fprintf(stderr, "Please enter a valid number\n");
+					return -1;
+				}
+				if(len >= UINT_MAX){
+					fprintf(stderr, "Entered number is too large\n");
+					return -1;
+				}
+				break;
+			default:
+				printf("Unidentified Option\n");
+				return 0;
+		}
+
+	}
+
 	size_t bufferSize = sizeof(BUFFER) + len*sizeof(char);
 
 	sem_t *writeSem = sem_open(WRITESEM, O_EXCL|O_CREAT, 0600, len);
@@ -84,28 +115,47 @@ int main(int arc, char **argv){
 	char *ch;
 
 	while(1){
-		result = scanf("%s", input);
+		result = scanf("%[^\n]%*c", input);
 
 		if(result == EOF){
+			while(sem_wait(writeSem) == -1){
+				if(errno != EINTR){
+					perror("Sem_wait");
+					close(shm);
+					shm_unlink(SHMNAME);
+					sem_close(writeSem);
+					sem_unlink(WRITESEM);
+					sem_close(readSem);
+					sem_unlink(READSEM);
+					exit(1);
+				}
+			}
 			sharedMem->data[sharedMem->wIndex] = EOF;
 			sharedMem->wIndex++;
 			sem_post(readSem);
 			break;
 		}
 
-		//strcat(input, "\0")
-		printf("scan works %s\n", input);
-
 		for(ch = input; *ch != '\0'; ch++){
-			sem_wait(writeSem);
-			printf("%c %ld\n", *ch, writeSem->__align);
+			while(sem_wait(writeSem) == -1){
+				if(errno != EINTR){
+					perror("Sem_wait");
+					close(shm);
+					shm_unlink(SHMNAME);
+					sem_close(writeSem);
+					sem_unlink(WRITESEM);
+					sem_close(readSem);
+					sem_unlink(READSEM);
+					exit(1);
+				}
+			}
+			//printf("%c %ld\n", *ch, writeSem->__align);
 			sharedMem->data[sharedMem->wIndex] = *ch;
 			sharedMem->wIndex = (sharedMem->wIndex + 1) % len;
 			sem_post(readSem);
 		}
 
 	}
-	printf("after wait\n");
 
 	//Release Semaphoore and Shared Memory
 	if(munmap(sharedMem, bufferSize) != 0){
@@ -119,10 +169,8 @@ int main(int arc, char **argv){
 		exit(1);
 	}
 
+
 	close(shm);
-	shm_unlink(SHMNAME);
 	sem_close(writeSem);
-	sem_unlink(WRITESEM);
 	sem_close(readSem);
-	sem_unlink(READSEM);
 }

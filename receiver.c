@@ -11,12 +11,43 @@
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include "buff.h"
+#include <errno.h>
 
 int main(int argc, char **argv) {
-	size_t len = 20;
+	int opt;
+	char *options = "m:";
+	char *error;
+
+	size_t len;
+
+	if(argc <=2){
+		fprintf(stderr, "Option m is missing\n");
+		return 1;
+	}
+
+	while((opt = getopt(argc, argv, options)) != -1){
+		switch(opt){
+			case 'm':
+				len = strtol(optarg, &error, 10);
+				if(*optarg == *error){
+					fprintf(stderr, "Please enter a valid number\n");
+					return -1;
+				}
+				if(len >= UINT_MAX){
+					fprintf(stderr, "Entered number is too large\n");
+					return -1;
+				}
+				break;
+			default:
+				printf("Unidentified Option\n");
+				return 0;
+		}
+	}
+
 	size_t bufferSize = sizeof(BUFFER) + len*sizeof(char);
 
 	sem_t *writeSem = sem_open(WRITESEM, 0);
@@ -56,7 +87,18 @@ int main(int argc, char **argv) {
 	//Reading part of the program
 	char ch;
 	while(1){
-		sem_wait(readSem);
+		while(sem_wait(readSem) == -1){
+			if(errno != EINTR){
+				perror("sem_wait");
+				close(shm);
+				shm_unlink(SHMNAME);
+				sem_close(writeSem);
+				sem_unlink(WRITESEM);
+				sem_close(readSem);
+				sem_unlink(READSEM);
+				exit(1);
+			}
+		}
 		ch = sharedMem->data[sharedMem->rIndex];
 		if(ch == EOF){
 			break;
@@ -77,7 +119,10 @@ int main(int argc, char **argv) {
 	}
 
 	close(shm);
+	shm_unlink(SHMNAME);
 	sem_close(readSem);
-	sem_close(writeSem);
+	sem_unlink(WRITESEM);
+	sem_close(readSem);
+	sem_unlink(READSEM);
 }
 
