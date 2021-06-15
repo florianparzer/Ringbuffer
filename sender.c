@@ -25,6 +25,10 @@ int main(int argc, char *argv[]){
 
 	size_t len;
 
+	int result = 0;
+	char input[5000];
+	char *ch;
+
 	if(argc <=2){
 		fprintf(stderr, "Option m is missing\n");
 		return 1;
@@ -110,9 +114,6 @@ int main(int argc, char *argv[]){
 	sem_post(readSem);
 
 	printf("Start writing\n");
-	int result = 0;
-	char input[500];
-	char *ch;
 
 	while(1){
 		result = scanf("%[^\n]%*c", input);
