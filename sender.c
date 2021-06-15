@@ -155,6 +155,23 @@ int main(int argc, char *argv[]){
 			sem_post(readSem);
 		}
 
+		*ch = '\n';
+		while(sem_wait(writeSem) == -1){
+			if(errno != EINTR){
+				perror("Sem_wait");
+				close(shm);
+				shm_unlink(SHMNAME);
+				sem_close(writeSem);
+				sem_unlink(WRITESEM);
+				sem_close(readSem);
+				sem_unlink(READSEM);
+				exit(1);
+			}
+		}
+		sharedMem->data[sharedMem->wIndex] = *ch;
+		sharedMem->wIndex = (sharedMem->wIndex + 1) % len;
+		sem_post(readSem);
+
 	}
 
 	//Release Semaphoore and Shared Memory
